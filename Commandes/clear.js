@@ -33,19 +33,32 @@ module.exports = {
         if(parseInt(number) <= 0 || parseInt(number) > 100) return message.reply("Le nombre doit être compris entre 1 et 100 !")
 
         await message.deferReply()
+        
         try {
 
-            let messages = await channel.bulkDelete(parseInt(number))
+            let messages = await channel.messages.fetch({ limit: parseInt(number) + 1 });
+            messages = messages.filter(msg => msg.deletable);
+            await Promise.all(messages.map(msg => msg.delete()));
 
             await message.followUp({content: `J'ai supprimé \`${messages.size}\` messages !`, ephemeral: true})
 
         } catch(err) {
-
-            let messages = [...(await channel.messages.fetch()).filter(async msg => (Date.now() - msg.createdAt) <= 1209600000).values()]
-            if(messages.length <= 0) return message.followUp("Je ne peux pas supprimer de message car ils datent de plus de 14 jours !")
-            await channel.bulkDelete(messages)
-
-            await message.followUp({content: `J'ai pu supprimer uniquement \`${messages.length}\` messages car les autres dataient de plus de 14 jours !`, ephemeral: true})
+            let messages = await channel.messages.fetch();
+        
+            messages = messages.filter(msg => (Date.now() - msg.createdAt) <= 1209600000);
+        
+            if (messages.size <= 0) {
+                return message.followUp("Je ne peux pas supprimer de message car ils datent de plus de 14 jours !");
+            }
+        
+            try {
+                await channel.bulkDelete(messages);
+                await message.followUp({content: `J'ai pu supprimer uniquement \`${messages.size}\` messages car les autres dataient de plus de 14 jours !`, ephemeral: true});
+            } catch (error) {
+                console.error(error);
+                return message.followUp("Une erreur s'est produite lors de la suppression des messages.");
+            }
         }
+        
     }
 }
